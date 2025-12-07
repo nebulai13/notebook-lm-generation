@@ -47,7 +47,16 @@
 - [x] Error testing and fixes (syntax checks passed)
 - [x] Code optimization
 - [x] Install script (install.sh)
-- [ ] GitHub push (in progress)
+- [x] GitHub push - pushed to qwitch13 and nebulai13
+
+#### Phase 6: Enhancements (2025-12-07)
+- [x] Fixed echo color codes in install.sh (echo -e)
+- [x] Improved passkey/2FA/fingerprint verification handling
+- [x] Added system-wide `nlmgen` command installation
+- [x] Created man page (nlmgen.1)
+- [x] Created uninstall.sh script
+- [x] Updated README.md with comprehensive documentation
+- [x] Added password quoting advice (single quotes for special chars)
 
 ### Notes
 - NotebookLM doesn't have an official API, so we'll use Selenium for browser automation
@@ -55,6 +64,8 @@
 - Progress reporter will run in a separate thread
 - Added Anki flashcard support (.apkg format)
 - Tool opens Gemini at the end for additional interaction
+- System-wide command: `nlmgen` installed to /usr/local/bin
+- Man page available via `man nlmgen`
 
 ### Features Implemented
 - 10+ content generation types
@@ -65,9 +76,14 @@
 - Both NotebookLM and Anki flashcard formats
 - Fantasy AND Sci-Fi story generation
 - Complete podium discussion scripts
+- System-wide CLI command (`nlmgen`)
+- Comprehensive man page
+- Uninstall script with cleanup options
+- Passkey/Touch ID/Face ID/2FA support with 2-minute wait
 
 ### Issues Encountered
-- None - all syntax checks passed
+- Initial echo color codes not displaying (fixed with echo -e)
+- Passkey verification timing out (fixed with improved detection and longer wait)
 
 ---
 
