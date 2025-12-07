@@ -184,17 +184,22 @@ class GoogleAuthenticator:
             time.sleep(3)
 
             # Enter password
-            password_input = WebDriverWait(driver, 10).until(
+            password_input = WebDriverWait(driver, 15).until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "input[type='password']"))
             )
             password_input.clear()
             password_input.send_keys(password)
             password_input.send_keys(Keys.RETURN)
+
+            # Give time for page to transition
             time.sleep(5)
 
-            # Check for 2FA or other verification
-            if self._handle_verification():
-                self.logger.info("Handled verification step")
+            # Check for 2FA, passkey, or other verification
+            # This will wait up to 2 minutes for manual verification
+            self._handle_verification()
+
+            # Additional wait in case verification just completed
+            time.sleep(3)
 
             # Verify login success
             if self._is_logged_in():
@@ -202,10 +207,26 @@ class GoogleAuthenticator:
                 self.logger.info("Successfully logged into Google account")
                 return True
             else:
+                # One more check - maybe we're already on a Google page
+                current_url = driver.current_url
+                if any(domain in current_url for domain in ["google.com", "notebooklm", "gemini"]):
+                    if "signin" not in current_url and "accounts.google.com/v3" not in current_url:
+                        self._save_cookies()
+                        self.logger.info("Successfully logged into Google account")
+                        return True
+
                 self.logger.error("Login failed - could not verify logged in state")
                 return False
 
         except TimeoutException as e:
+            # Check if we actually succeeded despite the timeout
+            try:
+                if self._is_logged_in():
+                    self._save_cookies()
+                    self.logger.info("Successfully logged into Google account")
+                    return True
+            except Exception:
+                pass
             self.logger.error(f"Login timeout: {e}")
             return False
         except Exception as e:
@@ -236,40 +257,62 @@ class GoogleAuthenticator:
             return False
 
     def _handle_verification(self) -> bool:
-        """Handle 2FA or other verification steps."""
+        """Handle 2FA, passkey, or other verification steps."""
         try:
             # Wait a moment for any verification page to load
             time.sleep(3)
 
-            # Check for phone verification
-            try:
-                phone_element = self.driver.find_element(
-                    By.XPATH, "//*[contains(text(), 'Verify it')]"
-                )
-                self.logger.warning("Phone verification required - please complete manually")
-                # Wait for manual completion
-                WebDriverWait(self.driver, 120).until(
-                    lambda d: "myaccount" in d.current_url or "mail" in d.current_url
-                )
-                return True
-            except NoSuchElementException:
-                pass
+            # List of verification indicators to check
+            verification_patterns = [
+                "Verify it",
+                "2-Step Verification",
+                "passkey",
+                "Passkey",
+                "Use your passkey",
+                "fingerprint",
+                "Fingerprint",
+                "Touch ID",
+                "Face ID",
+                "security key",
+                "Confirm it's you",
+                "Verify your identity",
+                "Choose how to sign in",
+            ]
 
-            # Check for 2FA app verification
-            try:
-                self.driver.find_element(
-                    By.XPATH, "//*[contains(text(), '2-Step Verification')]"
-                )
-                self.logger.warning("2FA required - please complete manually")
+            # Check if we're on a verification page
+            page_source = self.driver.page_source.lower()
+            needs_verification = any(
+                pattern.lower() in page_source for pattern in verification_patterns
+            )
+
+            if needs_verification:
+                self.logger.warning("=" * 50)
+                self.logger.warning("VERIFICATION REQUIRED")
+                self.logger.warning("Please complete verification in the browser window:")
+                self.logger.warning("- Passkey/fingerprint")
+                self.logger.warning("- 2FA code")
+                self.logger.warning("- Phone verification")
+                self.logger.warning("Waiting up to 2 minutes...")
+                self.logger.warning("=" * 50)
+
+                # Wait for manual completion - check multiple success indicators
                 WebDriverWait(self.driver, 120).until(
-                    lambda d: "myaccount" in d.current_url or "mail" in d.current_url
+                    lambda d: any([
+                        "myaccount.google.com" in d.current_url,
+                        "mail.google.com" in d.current_url,
+                        "notebooklm" in d.current_url.lower(),
+                        "gemini" in d.current_url.lower(),
+                        "accounts.google.com/b/" in d.current_url,  # Account switcher (logged in)
+                    ])
                 )
+                self.logger.info("Verification completed successfully!")
                 return True
-            except NoSuchElementException:
-                pass
 
             return False
 
+        except TimeoutException:
+            self.logger.error("Verification timed out - please try again")
+            return False
         except Exception as e:
             self.logger.debug(f"Verification handling: {e}")
             return False
